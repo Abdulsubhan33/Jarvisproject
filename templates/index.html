@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>JARVIS Assistant</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      font-family: 'Courier New', monospace;
+      color: #00ffe0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+      text-shadow: 0 0 10px #00ffe0, 0 0 20px #00ffe0;
+    }
+    .jarvis-container {
+      border: 2px solid #00ffe0;
+      padding: 2rem;
+      border-radius: 15px;
+      background: rgba(0,255,255,0.05);
+      box-shadow: 0 0 30px #00ffe0;
+      text-align: center;
+      width: 80%;
+      max-width: 500px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #00ffe0;
+      border: none;
+      color: black;
+      border-radius: 5px;
+      margin-top: 20px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 1rem;
+      box-shadow: 0 0 10px #00ffe0, 0 0 20px #00ffe0;
+      transition: background 0.3s, color 0.3s;
+    }
+    button:hover {
+      background-color: black;
+      color: #00ffe0;
+      border: 1px solid #00ffe0;
+    }
+    .result {
+      margin-top: 2rem;
+      font-size: 1.1rem;
+      min-height: 50px;
+      text-align: left;
+      background-color: rgba(0,255,255,0.1);
+      border: 1px solid #00ffe0;
+      padding: 1rem;
+      border-radius: 5px;
+      overflow-y: auto;
+      max-height: 200px;
+    }
+    .typing {
+      border-right: 3px solid #00ffe0;
+      white-space: nowrap;
+      overflow: hidden;
+      animation: typing 2s steps(40, end), blink-caret 0.75s step-end infinite;
+    }
+    @keyframes typing {
+      from { width: 0 }
+      to { width: 100% }
+    }
+    @keyframes blink-caret {
+      50% { border-color: transparent }
+    }
+  </style>
+</head>
+<body>
+  <h1>JARVIS Virtual Assistant</h1>
+  <div class="jarvis-container">
+    <div class="result" id="result">Initializing JARVIS...</div>
+    <button id="start">🎤 Speak to Jarvis</button>
+  </div>
+  <script>
+    const startBtn = document.getElementById("start");
+    const resultDiv = document.getElementById("result");
+
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+
+    startBtn.addEventListener("click", () => {
+      recognition.start();
+    });
+
+    recognition.onstart = () => {
+      resultDiv.innerHTML = '<span class="typing">Listening...</span>';
+    };
+
+    recognition.onresult = function(event) {
+      const text = event.results[0][0].transcript;
+      resultDiv.innerHTML = `<strong>You:</strong> ${text}`;
+
+      fetch("/process", {
+        method: "POST",
+        body: JSON.stringify({ command: text }),
+        headers: { "Content-Type": "application/json" }
+      })
+      .then(response => response.json())
+      .then(data => {
+  resultDiv.innerHTML += `<br><strong>Jarvis:</strong> ${data.response}`;
+
+  const synth = window.speechSynthesis;
+  const utter = new SpeechSynthesisUtterance(data.response);
+  utter.volume = 1;
+  utter.rate = 1;
+  utter.pitch = 1;
+
+  function speak() {
+    const voices = synth.getVoices();
+    console.log("VOICES:", voices.map(v => v.name));
+    const preferred = voices.find(v => v.name === "Google US English");
+    if (preferred) {
+      utter.voice = preferred;
+      console.log("Using voice:", preferred.name);
+    } else {
+      console.warn("Google US English not found, using fallback.");
+    }
+    synth.speak(utter);
+  }
+
+  if (synth.getVoices().length === 0) {
+    synth.onvoiceschanged = speak;
+  } else {
+    speak();
+  }
+})
+
+      .catch(error => {
+        resultDiv.innerHTML += `<br><strong>Jarvis Error:</strong> ${error}`;
+      });
+    };
+
+    recognition.onerror = function(event) {
+      resultDiv.innerHTML = `<strong>Error:</strong> ${event.error}`;
+    };
+  </script>
+</body>
+</html>
